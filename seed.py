@@ -10,70 +10,87 @@ cred = credentials.Certificate('petalbot-2c6e7-firebase-adminsdk-fbsvc-f15379076
 firebase_admin.initialize_app(cred)
 db = firestore.client()
 
-# Funkcija za pridobivanje seznam rastlin iz Perenual API
-def get_plants_list():
-    api_key = 'sk-CVAw6824734ae5c6710442'
-    url = f'https://perenual.com/api/v2/species-list?key={api_key}'
-    response = requests.get(url)
-    
-    if response.status_code == 200:
-        return response.json()
-    else:
-        raise Exception(f"API Error: {response.status_code}")
+# API ključ
+PERENUAL_API_KEY = 'sk-CVAw6824734ae5c6710442'
 
-# Funkcija za pridobivanje podrobnosti rastline iz Perenual API
+# Seznam pogostih rastlin
+indoor_plants = [
+    "Snake Plant", "Spider Plant", "Peace Lily", "Pothos", "ZZ Plant", "Aloe Vera", "Philodendron",
+    "Fiddle Leaf Fig", "Rubber Plant", "Dracaena", "Dieffenbachia", "Chinese Evergreen", "Areca Palm",
+    "Bamboo Palm", "Boston Fern", "Calathea", "Prayer Plant", "Croton", "Jade Plant", "Peperomia",
+    "Schefflera", "Kalanchoe", "Anthurium", "Begonia", "Oxalis", "African Violet", "Cast Iron Plant",
+    "English Ivy", "Norfolk Island Pine", "Hoya"
+]
+
+outdoor_plants = [
+    "Tomato", "Basil", "Lavender", "Rosemary", "Mint", "Cilantro", "Thyme", "Chives", "Parsley", "Oregano",
+    "Sunflower", "Marigold", "Petunia", "Geranium", "Zinnia", "Begonia", "Dahlia", "Peony", "Hosta", "Daylily",
+    "Hydrangea", "Lilac", "Rhododendron", "Azalea", "Boxwood", "Iris", "Coneflower", "Snapdragon", "Calendula", "Salvia"
+]
+
+def get_plant_by_name(plant_name):
+    """Vrne podatke za prvo rastlino, ki se ujema z imenom"""
+    url = f"https://perenual.com/api/v2/species-list?key={PERENUAL_API_KEY}&q={plant_name}"
+    response = requests.get(url)
+
+    if response.status_code == 200:
+        results = response.json().get("data", [])
+        if results:
+            return results[0]  # prva najdena
+    return None
+
 def get_plant_details(plant_id):
-    api_key = 'sk-CVAw6824734ae5c6710442'
-    url = f'https://perenual.com/api/v2/species/details/{plant_id}?key={api_key}'
+    url = f"https://perenual.com/api/v2/species/details/{plant_id}?key={PERENUAL_API_KEY}"
     response = requests.get(url)
-    
+
     if response.status_code == 200:
         return response.json()
-    else:
-        raise Exception(f"API Error: {response.status_code}")
+    return {}
 
-# Funkcija za shranjevanje podatkov v Firestore
-def save_plants_to_firestore(plants_data):
-    for plant in plants_data['data']:
-        plant_id = plant['id']
-        plant_name = plant['common_name']
-        
-        # Pridobivanje podrobnosti o rastlini
-        plant_details = get_plant_details(plant_id)
-        
-        # Priprava podatkov za shranjevanje
-        plant_info = {
-            'name': plant_name,
-            'scientific_name': plant['scientific_name'],
-            'common_name': plant['common_name'],
-            'family': plant_details.get('family', 'No information'),
-            'watering': plant_details.get('watering', 'No information'),
-            'sunlight': plant_details.get('sunlight', 'No information'),
-            'growth_rate': plant_details.get('growth_rate', 'No information'),
-            'care_level': plant_details.get('care_level', 'No information'),
-            'description': plant_details.get('description', 'No description available'),
-            'image': plant_details['default_image']['regular_url']
-        }
-        
-        # Dodajanje rastline v Firestore
-        doc_ref = db.collection('plants').document(plant_name)
-        doc_ref.set(plant_info)
-        print(f"Added {plant_name} to Firestore")
-
-@app.route('/add_plants', methods=['GET'])
-def add_plants():
+def save_plant_to_firestore(name, category, basic_data, details):
     try:
-        print("Requesting plant list...")
-        # Pridobivanje seznam rastlin iz Perenual API
-        plants_data = get_plants_list()
-        print(f"Found {len(plants_data['data'])} plants")
-        
-        # Shranjevanje podatkov v Firestore
-        save_plants_to_firestore(plants_data)
-        
-        return "Plants added to Firestore successfully!"
+        plant_doc = {
+            'type': category,
+            'name': name,
+            'scientific_name': basic_data.get('scientific_name', 'Unknown'),
+            'common_name': basic_data.get('common_name', name),
+            'family': details.get('family', 'No information'),
+            'watering': details.get('watering', 'No information'),
+            'sunlight': ", ".join(details.get('sunlight', [])),
+            'growth_rate': details.get('growth_rate', 'No information'),
+            'care_level': details.get('care_level', 'No information'),
+            'description': details.get('description', 'No description available'),
+            'image': (details.get('default_image') or {}).get('regular_url', '')
+        }
+        db.collection('plants').document(name).set(plant_doc)
+        print(f"[OK] Added: {name}")
     except Exception as e:
-        return f"Error: {str(e)}"
+        print(f"[ERROR] {name}: {str(e)}")
+
+@app.route('/add_common_plants', methods=['GET'])
+def add_common_plants():
+    errors = []
+    total = 0
+
+    for plant_name in indoor_plants:
+        result = get_plant_by_name(plant_name)
+        if result:
+            details = get_plant_details(result['id'])
+            save_plant_to_firestore(plant_name, "indoor", result, details)
+            total += 1
+        else:
+            errors.append(plant_name)
+
+    for plant_name in outdoor_plants:
+        result = get_plant_by_name(plant_name)
+        if result:
+            details = get_plant_details(result['id'])
+            save_plant_to_firestore(plant_name, "outdoor", result, details)
+            total += 1
+        else:
+            errors.append(plant_name)
+
+    return f"✅ Shranjenih rastlin: {total}, ❌ Ni jih bilo mogoče najti: {len(errors)} — {errors}"
 
 if __name__ == '__main__':
     app.run(debug=True)

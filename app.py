@@ -8,6 +8,7 @@ CORS(app)
 
 PLANTNET_API_KEY = "2b10i98sqc00Pe5mJAJTwoG4e"
 PERENUAL_API_KEY = "sk-CVAw6824734ae5c6710442"
+GEMINI_API_KEY = "AIzaSyDDGnqLD9p3JvJbHGLNvfXIPaAsFcQY9ok"
 
 PLANTNET_API_URL = f"https://my-api.plantnet.org/v2/identify/all?api-key={PLANTNET_API_KEY}"
 PERENUAL_CARE_URL = "https://perenual.com/api/species-care-guide-list"
@@ -76,6 +77,8 @@ def identify():
         }), care_response.status_code
 
     care_data = care_response.json()
+    print("[plantnet] Podatki za plantnet")
+    print(plantnet_result)
     print("[Perenual] Podatki o skrbi za rastlino (care guide):")
     print(care_data)  # tukaj printaš celoten JSON odgovor v konzolo
 
@@ -83,6 +86,42 @@ def identify():
         "plantnet_result": plantnet_result,
         "care_data": care_data
     })
+
+@app.route('/get-plant-care', methods=['POST'])
+def get_plant_care():
+    data = request.get_json()
+    plant_name = data.get('plant', 'unknown plant')
+
+    prompt = (
+        f"You are PetalBot, a helpful gardening assistant. "
+        f"In a few sentences, explain how to take care of the plant \"{plant_name}\". "
+        f"Include ideal sun exposure, watering frequency, and any special care tips. "
+        f"Be brief and practical."
+    )
+
+    gemini_url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={GEMINI_API_KEY}"
+
+    payload = {
+        "contents": [
+            {
+                "parts": [{"text": prompt}]
+            }
+        ]
+    }
+
+    headers = {'Content-Type': 'application/json'}
+
+    gemini_response = requests.post(gemini_url, headers=headers, json=payload)
+
+    if gemini_response.ok:
+        result = gemini_response.json()
+        content = result.get("candidates", [{}])[0].get("content", {})
+        parts = content.get("parts", [])
+        care_instructions = parts[0].get("text", "") if parts else "No response from Gemini."
+        return jsonify({'care_instructions': care_instructions})
+    else:
+        return jsonify({'error': 'Gemini API error'}), 500
+
 
 
 if __name__ == "__main__":
