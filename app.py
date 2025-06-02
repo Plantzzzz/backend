@@ -1,14 +1,19 @@
+import os
 from flask import Flask, request, jsonify
+from dotenv import load_dotenv
 import requests
 from werkzeug.utils import secure_filename
 from flask_cors import CORS
 
+load_dotenv()
+
 app = Flask(__name__)
 CORS(app)
 
-PLANTNET_API_KEY = "2b10i98sqc00Pe5mJAJTwoG4e"
-PERENUAL_API_KEY = "sk-CVAw6824734ae5c6710442"
-GEMINI_API_KEY = "AIzaSyDDGnqLD9p3JvJbHGLNvfXIPaAsFcQY9ok"
+
+PLANTNET_API_KEY = os.getenv("PLANTNET_API_KEY")
+PERENUAL_API_KEY = os.getenv("PERENUAL_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
 PLANTNET_API_URL = f"https://my-api.plantnet.org/v2/identify/all?api-key={PLANTNET_API_KEY}"
 PERENUAL_CARE_URL = "https://perenual.com/api/species-care-guide-list"
