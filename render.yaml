@@ -1,7 +1,7 @@
 # render.yaml
 services:
   - type: web
-    name: flask-plant-app
+    name: petalbot
     env: python
     buildCommand: "pip install -r requirements.txt"
     startCommand: "gunicorn app:app"
