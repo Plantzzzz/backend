@@ -27,8 +27,8 @@ backend/ <br>
 
 ## 📡 API
 Aplikacija za delovanje uporablja 
--PlantNet API (prepoznava rasltine)
--Perenual API (pridobivanje dodatnih informacij) 
--Gemini API (pridobivanje nasveta)
+- PlantNet API (prepoznava rasltine)
+- Perenual API (pridobivanje dodatnih informacij) 
+- Gemini API (pridobivanje nasveta)
 
 
